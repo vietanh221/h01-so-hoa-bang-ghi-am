@@ -1,0 +1,6 @@
+{
+  "name": "Ký Ức Băng Từ — H01",
+  "description": "Hệ thống số hoá băng ghi âm cassette, đĩa cũ trong gia đình và cộng đồng — Đề tài H01 (Phạm Việt Anh, PH59336).",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

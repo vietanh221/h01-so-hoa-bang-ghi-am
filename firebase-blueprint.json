@@ -1,0 +1,184 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Public contributor profile metadata without sensitive PII.",
+      "type": "object",
+      "properties": {
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Display name of the archivist or family contributor."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["contributor"],
+          "description": "Contributor role locked on self-registration."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of profile creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last profile update."
+        }
+      },
+      "required": ["displayName", "role", "createdAt", "updatedAt"]
+    },
+    "AudioRecord": {
+      "title": "AudioRecord",
+      "description": "Digitized cassette or disc archival record card with speaker, year, description, and usage scope.",
+      "type": "object",
+      "properties": {
+        "accessionCode": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 32,
+          "pattern": "^[A-Za-z0-9\\-]+$",
+          "description": "Archival catalog code such as H01-1994-01."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 140,
+          "description": "Title of the digitized audio recording."
+        },
+        "speaker": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100,
+          "description": "Primary speaker, narrator, or performer on the tape/disc."
+        },
+        "year": {
+          "type": "integer",
+          "description": "Year the original tape or disc was recorded (1930-2026)."
+        },
+        "location": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120,
+          "description": "Village, neighborhood, or family context where recorded."
+        },
+        "sourceFormat": {
+          "type": "string",
+          "enum": ["cassette", "vinyl_cd", "reel_to_reel", "other"],
+          "description": "Physical carrier format before digitization."
+        },
+        "physicalCondition": {
+          "type": "string",
+          "enum": ["good", "fair", "fragile"],
+          "description": "Condition of the physical cassette or disc."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 2000,
+          "description": "Detailed archival summary of the recording content."
+        },
+        "durationSeconds": {
+          "type": "number",
+          "description": "Playback duration in seconds (1 to 14400)."
+        },
+        "usageScope": {
+          "type": "string",
+          "enum": ["private", "family", "community", "public"],
+          "description": "Permitted usage scope for the digitized recording."
+        },
+        "usageNotes": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Specific attribution or usage conditions set by the family or community."
+        },
+        "audioMode": {
+          "type": "string",
+          "enum": ["local_blob", "heritage_synth"],
+          "description": "Whether audio is stored in local IndexedDB blob or synthesized archival preset."
+        },
+        "audioStorageKey": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "IndexedDB key for local digitized audio blob, or empty string."
+        },
+        "synthPreset": {
+          "type": "string",
+          "enum": [
+            "lullaby_1992",
+            "radio_broadcast_1986",
+            "village_festival_1998",
+            "tet_letter_1995",
+            "folk_strings_1989",
+            "custom_tape"
+          ],
+          "description": "Acoustic heritage synthesis preset identifier."
+        },
+        "waveformPeaks": {
+          "type": "array",
+          "description": "Bounded array of 32-64 normalized amplitude peaks (0..1)."
+        },
+        "markers": {
+          "type": "array",
+          "description": "Bounded array of up to 20 timestamped content markers."
+        },
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$",
+          "description": "Firebase Auth UID of the contributor."
+        },
+        "ownerName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "Display name of the contributor."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last update."
+        }
+      },
+      "required": [
+        "accessionCode",
+        "title",
+        "speaker",
+        "year",
+        "location",
+        "sourceFormat",
+        "physicalCondition",
+        "description",
+        "durationSeconds",
+        "usageScope",
+        "usageNotes",
+        "audioMode",
+        "audioStorageKey",
+        "synthPreset",
+        "waveformPeaks",
+        "markers",
+        "ownerId",
+        "ownerName",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Stores contributor display profiles keyed by Firebase Auth UID."
+    },
+    "/audioRecords/{recordId}": {
+      "schema": { "$ref": "#/entities/AudioRecord" },
+      "description": "Stores digitized audio tape and disc catalog cards with usage scopes."
+    }
+  }
+}

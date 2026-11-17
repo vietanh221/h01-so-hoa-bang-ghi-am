@@ -1,0 +1,259 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Safety Net: Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Reusable Hardened Primitives ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isVerifiedUser() && (
+        request.auth.token.email == 'anhtaotenduong@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // --- Validation Blueprints ---
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['displayName', 'role', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['displayName', 'role', 'createdAt', 'updatedAt'])
+        && data.displayName is string
+        && data.displayName.size() >= 1
+        && data.displayName.size() <= 100
+        && data.role == 'contributor'
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMarkerEntry(marker) {
+      return marker is map
+        && marker.keys().hasAll(['timeSec', 'label'])
+        && marker.keys().hasOnly(['timeSec', 'label'])
+        && marker.timeSec is number
+        && marker.timeSec >= 0
+        && marker.timeSec <= 14400
+        && marker.label is string
+        && marker.label.size() >= 1
+        && marker.label.size() <= 120;
+    }
+
+    function isValidAudioRecord(data) {
+      return data.keys().hasAll([
+        'accessionCode',
+        'title',
+        'speaker',
+        'year',
+        'location',
+        'sourceFormat',
+        'physicalCondition',
+        'description',
+        'durationSeconds',
+        'usageScope',
+        'usageNotes',
+        'audioMode',
+        'audioStorageKey',
+        'synthPreset',
+        'waveformPeaks',
+        'markers',
+        'ownerId',
+        'ownerName',
+        'createdAt',
+        'updatedAt'
+      ])
+      && data.keys().hasOnly([
+        'accessionCode',
+        'title',
+        'speaker',
+        'year',
+        'location',
+        'sourceFormat',
+        'physicalCondition',
+        'description',
+        'durationSeconds',
+        'usageScope',
+        'usageNotes',
+        'audioMode',
+        'audioStorageKey',
+        'synthPreset',
+        'waveformPeaks',
+        'markers',
+        'ownerId',
+        'ownerName',
+        'createdAt',
+        'updatedAt'
+      ])
+      && data.accessionCode is string
+      && data.accessionCode.size() >= 3
+      && data.accessionCode.size() <= 32
+      && data.accessionCode.matches('^[A-Za-z0-9\\-]+$')
+      && data.title is string
+      && data.title.size() >= 2
+      && data.title.size() <= 140
+      && data.speaker is string
+      && data.speaker.size() >= 2
+      && data.speaker.size() <= 100
+      && data.year is int
+      && data.year >= 1930
+      && data.year <= 2026
+      && data.location is string
+      && data.location.size() >= 1
+      && data.location.size() <= 120
+      && data.sourceFormat in ['cassette', 'vinyl_cd', 'reel_to_reel', 'other']
+      && data.physicalCondition in ['good', 'fair', 'fragile']
+      && data.description is string
+      && data.description.size() >= 10
+      && data.description.size() <= 2000
+      && data.durationSeconds is number
+      && data.durationSeconds >= 1
+      && data.durationSeconds <= 14400
+      && data.usageScope in ['private', 'family', 'community', 'public']
+      && data.usageNotes is string
+      && data.usageNotes.size() <= 500
+      && data.audioMode in ['local_blob', 'heritage_synth']
+      && data.audioStorageKey is string
+      && data.audioStorageKey.size() <= 128
+      && data.synthPreset in [
+        'lullaby_1992',
+        'radio_broadcast_1986',
+        'village_festival_1998',
+        'tet_letter_1995',
+        'folk_strings_1989',
+        'custom_tape'
+      ]
+      && data.waveformPeaks is list
+      && data.waveformPeaks.size() >= 1
+      && data.waveformPeaks.size() <= 64
+      && data.waveformPeaks[0] is number
+      && data.markers is list
+      && data.markers.size() <= 20
+      && (data.markers.size() == 0 || isValidMarkerEntry(data.markers[0]))
+      && data.ownerId is string
+      && data.ownerId.size() >= 1
+      && data.ownerId.size() <= 128
+      && data.ownerId.matches('^[a-zA-Z0-9_\\-]+$')
+      && data.ownerName is string
+      && data.ownerName.size() >= 1
+      && data.ownerName.size() <= 100
+      && data.createdAt is timestamp
+      && data.updatedAt is timestamp;
+    }
+
+    // --- Collection: /admins/{adminId} ---
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && isOwner(adminId);
+      allow list, create, update, delete: if false;
+    }
+
+    // --- Collection: /users/{userId} ---
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if false;
+      allow create: if isVerifiedUser()
+        && isValidId(userId)
+        && isOwner(userId)
+        && isValidUserProfile(incoming())
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+      allow update: if isVerifiedUser()
+        && isValidId(userId)
+        && (isOwner(userId) || isAdmin())
+        && isValidUserProfile(incoming())
+        && incoming().role == existing().role
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt']);
+      allow delete: if false;
+    }
+
+    // --- Collection: /audioRecords/{recordId} ---
+    match /audioRecords/{recordId} {
+      allow get: if isValidId(recordId) && (
+        existing().usageScope == 'public' ||
+        (isVerifiedUser() && existing().usageScope == 'community') ||
+        (isSignedIn() && existing().ownerId == request.auth.uid) ||
+        isAdmin()
+      );
+
+      allow list: if existing().usageScope == 'public'
+        || (isVerifiedUser() && existing().usageScope == 'community')
+        || (isSignedIn() && existing().ownerId == request.auth.uid);
+
+      allow create: if isVerifiedUser()
+        && isValidId(recordId)
+        && isValidAudioRecord(incoming())
+        && incoming().ownerId == request.auth.uid
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isVerifiedUser()
+        && isValidId(recordId)
+        && isValidAudioRecord(incoming())
+        && (
+          isAdmin() || (
+            existing().ownerId == request.auth.uid
+            && incoming().ownerId == existing().ownerId
+            && incoming().createdAt == existing().createdAt
+            && incoming().updatedAt == request.time
+            && (
+              // Action 1: Update archival metadata and scope
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'accessionCode',
+                'title',
+                'speaker',
+                'year',
+                'location',
+                'sourceFormat',
+                'physicalCondition',
+                'description',
+                'durationSeconds',
+                'usageScope',
+                'usageNotes',
+                'audioMode',
+                'audioStorageKey',
+                'synthPreset',
+                'waveformPeaks',
+                'markers',
+                'ownerName',
+                'updatedAt'
+              ]) ||
+              // Action 2: Update usage scope and rights notes only
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'usageScope',
+                'usageNotes',
+                'updatedAt'
+              ])
+            )
+          )
+        );
+
+      allow delete: if isVerifiedUser()
+        && isValidId(recordId)
+        && (existing().ownerId == request.auth.uid || isAdmin());
+    }
+  }
+}
